@@ -1,15 +1,14 @@
 import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
-const getterMap = new WeakMap<() => any, () => any>();
-const setterMap = new WeakMap<(v: any) => void, (v: any) => void>();
+const mapping = new WeakMap<() => any, () => any>();
 
 export class ReadOnlyHandler extends BaseProxyHandler {
     wrapValue(value: any): any {
         return this.membrane.getReadOnlyProxy(value);
     }
     wrapGetter(originalGet: () => any): () => any {
-        const wrappedGetter = getterMap.get(originalGet);
+        const wrappedGetter = mapping.get(originalGet);
         if (wrappedGetter !== undefined) {
             return wrappedGetter;
         }
@@ -18,22 +17,19 @@ export class ReadOnlyHandler extends BaseProxyHandler {
             // invoking the original getter with the original target
             return handler.wrapValue(originalGet.call(unwrap(this)));
         };
-        getterMap.set(originalGet, get);
+        mapping.set(originalGet, get);
         return get;
     }
     wrapSetter(originalSet: (v: any) => void): (v: any) => void {
-        const wrappedSetter = setterMap.get(originalSet);
-        if (wrappedSetter !== undefined) {
-            return wrappedSetter;
-        }
-        const handler = this;
-        const set = function (this: any, v: any) {
-            if (process.env.NODE_ENV !== 'production') {
-                throw new Error(`Invalid mutation: Cannot invoke a setter on "${handler.originalTarget}". "${handler.originalTarget}" is read-only.`);
-            }
-        };
-        setterMap.set(originalSet, set);
-        return set;
+    	if (!mapping.has(originalSet)) {
+    		const handler = this;
+    		mapping.set(originalSet, function (this: any, v: any) {
+		        if (process.env.NODE_ENV !== 'production') {
+		            throw new Error(`Invalid mutation: Cannot invoke a setter on "${handler.originalTarget}". "${handler.originalTarget}" is read-only.`);
+		        }
+		    })
+    	}
+        return mapping.get(originalSet)!;
     }
     set(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, value: any): boolean {
         if (process.env.NODE_ENV !== 'production') {
