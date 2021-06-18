@@ -1,15 +1,14 @@
 import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
-const getterMap = new WeakMap<() => any, () => any>();
-const setterMap = new WeakMap<(v: any) => void, (v: any) => void>();
+const mapping = new WeakMap<() => any, () => any>();
 
 export class ReactiveProxyHandler extends BaseProxyHandler {
     wrapValue(value: any): any {
         return this.membrane.getProxy(value);
     }
     wrapGetter(originalGet: () => any): () => any {
-        const wrappedGetter = getterMap.get(originalGet);
+        const wrappedGetter = mapping.get(originalGet);
         if (wrappedGetter !== undefined) {
             return wrappedGetter;
         }
@@ -18,12 +17,12 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // invoking the original getter with the original target
             return handler.wrapValue(originalGet.call(unwrap(this)));
         };
-        getterMap.set(originalGet, get);
-        getterMap.set(get, originalGet);
+        mapping.set(originalGet, get);
+        mapping.set(get, originalGet);
         return get;
     }
     wrapSetter(originalSet: (v: any) => void): (v: any) => void {
-        const wrappedSetter = setterMap.get(originalSet);
+        const wrappedSetter = mapping.get(originalSet);
         if (wrappedSetter !== undefined) {
             return wrappedSetter;
         }
@@ -31,8 +30,8 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // invoking the original setter with the original target
             originalSet.call(unwrap(this), unwrap(v));
         };
-        setterMap.set(originalSet, set);
-        setterMap.set(set, originalSet);;
+        mapping.set(originalSet, set);
+        mapping.set(set, originalSet);;
         return set;
     }
     private unwrapDescriptor(descriptor: PropertyDescriptor): PropertyDescriptor {
@@ -45,7 +44,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         return descriptor;
     }
     private unwrapGetter(redGet: () => any): () => any {
-        const reverseGetter = getterMap.get(redGet);
+        const reverseGetter = mapping.get(redGet);
         if (reverseGetter !== undefined) {
             return reverseGetter;
         }
@@ -54,12 +53,12 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // invoking the red getter with the proxy of this
             return unwrap(redGet.call(handler.wrapValue(this)));
         };
-        getterMap.set(get, redGet);
-        getterMap.set(redGet, get);
+        mapping.set(get, redGet);
+        mapping.set(redGet, get);
         return get;
     }
     private unwrapSetter(redSet: (v: any) => void): (v: any) => void {
-        const reverseSetter = setterMap.get(redSet);
+        const reverseSetter = mapping.get(redSet);
         if (reverseSetter !== undefined) {
             return reverseSetter;
         }
@@ -68,8 +67,8 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // invoking the red setter with the proxy of this
             redSet.call(handler.wrapValue(this), handler.wrapValue(v));
         };
-        setterMap.set(set, redSet);
-        setterMap.set(redSet, set);;
+        mapping.set(set, redSet);
+        mapping.set(redSet, set);;
         return set;
     }
     set(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, value: any): boolean {
