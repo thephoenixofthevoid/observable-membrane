@@ -1,4 +1,4 @@
-import { unwrap, isUndefined } from './shared';
+import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
 const getterMap = new WeakMap<() => any, () => any>();
@@ -10,7 +10,7 @@ export class ReadOnlyHandler extends BaseProxyHandler {
     }
     wrapGetter(originalGet: () => any): () => any {
         const wrappedGetter = getterMap.get(originalGet);
-        if (!isUndefined(wrappedGetter)) {
+        if (wrappedGetter !== undefined) {
             return wrappedGetter;
         }
         const handler = this;
@@ -23,14 +23,13 @@ export class ReadOnlyHandler extends BaseProxyHandler {
     }
     wrapSetter(originalSet: (v: any) => void): (v: any) => void {
         const wrappedSetter = setterMap.get(originalSet);
-        if (!isUndefined(wrappedSetter)) {
+        if (wrappedSetter !== undefined) {
             return wrappedSetter;
         }
         const handler = this;
         const set = function (this: any, v: any) {
             if (process.env.NODE_ENV !== 'production') {
-                const { originalTarget } = handler;
-                throw new Error(`Invalid mutation: Cannot invoke a setter on "${originalTarget}". "${originalTarget}" is read-only.`);
+                throw new Error(`Invalid mutation: Cannot invoke a setter on "${handler.originalTarget}". "${handler.originalTarget}" is read-only.`);
             }
         };
         setterMap.set(originalSet, set);
@@ -38,35 +37,30 @@ export class ReadOnlyHandler extends BaseProxyHandler {
     }
     set(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, value: any): boolean {
         if (process.env.NODE_ENV !== 'production') {
-            const { originalTarget } = this;
-            throw new Error(`Invalid mutation: Cannot set "${key.toString()}" on "${originalTarget}". "${originalTarget}" is read-only.`);
+            throw new Error(`Invalid mutation: Cannot set "${key.toString()}" on "${this.originalTarget}". "${this.originalTarget}" is read-only.`);
         }
         return false;
     }
     deleteProperty(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey): boolean {
         if (process.env.NODE_ENV !== 'production') {
-            const { originalTarget } = this;
-            throw new Error(`Invalid mutation: Cannot delete "${key.toString()}" on "${originalTarget}". "${originalTarget}" is read-only.`);
+            throw new Error(`Invalid mutation: Cannot delete "${key.toString()}" on "${this.originalTarget}". "${this.originalTarget}" is read-only.`);
         }
         return false;
     }
     setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any {
         if (process.env.NODE_ENV !== 'production') {
-            const { originalTarget } = this;
-            throw new Error(`Invalid prototype mutation: Cannot set prototype on "${originalTarget}". "${originalTarget}" prototype is read-only.`);
+            throw new Error(`Invalid prototype mutation: Cannot set prototype on "${this.originalTarget}". "${this.originalTarget}" prototype is read-only.`);
         }
     }
     preventExtensions(shadowTarget: ReactiveMembraneShadowTarget): boolean {
         if (process.env.NODE_ENV !== 'production') {
-            const { originalTarget } = this;
-            throw new Error(`Invalid mutation: Cannot preventExtensions on ${originalTarget}". "${originalTarget} is read-only.`);
+            throw new Error(`Invalid mutation: Cannot preventExtensions on ${this.originalTarget}". "${this.originalTarget} is read-only.`);
         }
         return false;
     }
     defineProperty(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, descriptor: PropertyDescriptor): boolean {
         if (process.env.NODE_ENV !== 'production') {
-            const { originalTarget } = this;
-            throw new Error(`Invalid mutation: Cannot defineProperty "${key.toString()}" on "${originalTarget}". "${originalTarget}" is read-only.`);
+            throw new Error(`Invalid mutation: Cannot defineProperty "${key.toString()}" on "${this.originalTarget}". "${this.originalTarget}" is read-only.`);
         }
         return false;
     }

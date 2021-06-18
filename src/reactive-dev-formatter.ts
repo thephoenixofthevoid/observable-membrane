@@ -1,11 +1,4 @@
 import {
-    ArrayPush,
-    ArrayConcat,
-    isArray,
-    ObjectCreate,
-    getPrototypeOf,
-    getOwnPropertyNames,
-    getOwnPropertySymbols,
     unwrap
 } from './shared';
 
@@ -20,7 +13,7 @@ interface DevToolFormatter {
 }
 
 function extract(objectOrArray: any): any {
-    if (isArray(objectOrArray)) {
+    if (Array.isArray(objectOrArray)) {
         return objectOrArray.map((item) => {
             const original = unwrap(item);
             if (original !== item) {
@@ -30,9 +23,11 @@ function extract(objectOrArray: any): any {
         });
     }
 
-    const obj = ObjectCreate(getPrototypeOf(objectOrArray));
-    const names = getOwnPropertyNames(objectOrArray);
-    return ArrayConcat.call(names, getOwnPropertySymbols(objectOrArray))
+    const obj = Object.create(Object.getPrototypeOf(objectOrArray));
+    const names = Object.getOwnPropertyNames(objectOrArray);
+    const symls = Object.getOwnPropertySymbols(objectOrArray);
+
+    return [ ...names, ...symls ]
         .reduce((seed: any, key: PropertyKey) => {
             const item = objectOrArray[key];
             const original = unwrap(item);
@@ -91,6 +86,6 @@ export function init() {
     //  - Under console, select "Enable custom formatters"
     // For more information, https://docs.google.com/document/d/1FTascZXT9cxfetuPRT2eXPQKXui4nWFivUnS_335T3U/preview
     const devtoolsFormatters = global.devtoolsFormatters || [];
-    ArrayPush.call(devtoolsFormatters, formatter);
+    devtoolsFormatters.push(formatter);
     global.devtoolsFormatters = devtoolsFormatters;
 }

@@ -1,10 +1,5 @@
 import {
-    ObjectDefineProperty,
     unwrap,
-    isArray,
-    isUndefined,
-    getPrototypeOf,
-    isFunction,
     registerProxy,
 } from './shared';
 import { ReactiveProxyHandler } from './reactive-handler';
@@ -16,6 +11,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 interface ReactiveState {
+	membrane: any;
     readOnly: any;
     reactive: any;
 }
@@ -33,7 +29,6 @@ export interface ObservableMembraneInit {
     tagPropertyKey?: PropertyKey;
 }
 
-const ObjectDotPrototype = Object.prototype;
 
 function defaultValueIsObservable(value: any): boolean {
     // intentionally checking for null
@@ -46,12 +41,12 @@ function defaultValueIsObservable(value: any): boolean {
         return false;
     }
 
-    if (isArray(value)) {
+    if (Array.isArray(value)) {
         return true;
     }
 
-    const proto = getPrototypeOf(value);
-    return (proto === ObjectDotPrototype || proto === null || getPrototypeOf(proto) === null);
+    const proto = Object.getPrototypeOf(value);
+    return (proto === Object.prototype || proto === null || Object.getPrototypeOf(proto) === null);
 }
 
 const defaultValueObserved: ReactiveMembraneAccessCallback = (obj: any, key: PropertyKey) => {
@@ -63,7 +58,7 @@ const defaultValueMutated: ReactiveMembraneMutationCallback = (obj: any, key: Pr
 const defaultValueDistortion: ReactiveMembraneDistortionCallback = (value: any) => value;
 
 function createShadowTarget(value: any): any {
-    return isArray(value) ? [] : {};
+    return Array.isArray(value) ? [] : {};
 }
 
 export class ReactiveMembrane {
@@ -74,15 +69,12 @@ export class ReactiveMembrane {
     tagPropertyKey: PropertyKey | undefined;
     private objectGraph: WeakMap<any, ReactiveState> = new WeakMap();
 
-    constructor(options?: ObservableMembraneInit) {
-        if (!isUndefined(options)) {
-            const { valueDistortion, valueMutated, valueObserved, valueIsObservable, tagPropertyKey } = options;
-            this.valueDistortion = isFunction(valueDistortion) ? valueDistortion : defaultValueDistortion;
-            this.valueMutated = isFunction(valueMutated) ? valueMutated : defaultValueMutated;
-            this.valueObserved = isFunction(valueObserved) ? valueObserved : defaultValueObserved;
-            this.valueIsObservable = isFunction(valueIsObservable) ? valueIsObservable : defaultValueIsObservable;
-            this.tagPropertyKey = tagPropertyKey;
-        }
+    constructor({ valueDistortion, valueMutated, valueObserved, valueIsObservable, tagPropertyKey }: ObservableMembraneInit = {}) {
+        if (valueDistortion) this.valueDistortion = valueDistortion;
+        if (valueMutated) this.valueMutated = valueMutated;
+        if (valueObserved) this.valueObserved = valueObserved;
+        if (valueIsObservable) this.valueIsObservable = valueIsObservable;
+        if (tagPropertyKey) this.tagPropertyKey = tagPropertyKey;
     }
 
     getProxy(value: any) {
@@ -111,34 +103,29 @@ export class ReactiveMembrane {
     }
 
     private getReactiveState(value: any, distortedValue: any): ReactiveState {
-        const {
-            objectGraph,
-        } = this;
-        let reactiveState = objectGraph.get(distortedValue);
+        let reactiveState = this.objectGraph.get(distortedValue);
         if (reactiveState) {
             return reactiveState;
         }
-        const membrane = this;
-        reactiveState = {
+        this.objectGraph.set(distortedValue, reactiveState = {
+        	membrane: this,
             get reactive() {
-                const reactiveHandler = new ReactiveProxyHandler(membrane, distortedValue);
+                const reactiveHandler = new ReactiveProxyHandler(this.membrane, distortedValue);
                 // caching the reactive proxy after the first time it is accessed
                 const proxy = new Proxy(createShadowTarget(distortedValue), reactiveHandler);
                 registerProxy(proxy, value);
-                ObjectDefineProperty(this, 'reactive', { value: proxy });
+                Object.defineProperty(this, 'reactive', { value: proxy });
                 return proxy;
             },
             get readOnly() {
-                const readOnlyHandler = new ReadOnlyHandler(membrane, distortedValue);
+                const readOnlyHandler = new ReadOnlyHandler(this.membrane, distortedValue);
                 // caching the readOnly proxy after the first time it is accessed
                 const proxy = new Proxy(createShadowTarget(distortedValue), readOnlyHandler);
                 registerProxy(proxy, value);
-                ObjectDefineProperty(this, 'readOnly', { value: proxy });
+                Object.defineProperty(this, 'readOnly', { value: proxy });
                 return proxy;
             }
-        } as ReactiveState;
-
-        objectGraph.set(distortedValue, reactiveState);
+        });
         return reactiveState;
     }
 

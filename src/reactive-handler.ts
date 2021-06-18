@@ -1,4 +1,4 @@
-import { toString, isArray, unwrap, isExtensible, preventExtensions, ObjectDefineProperty, hasOwnProperty, isUndefined } from './shared';
+import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
 const getterMap = new WeakMap<() => any, () => any>();
@@ -12,7 +12,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
     }
     wrapGetter(originalGet: () => any): () => any {
         const wrappedGetter = getterMap.get(originalGet);
-        if (!isUndefined(wrappedGetter)) {
+        if (wrappedGetter !== undefined) {
             return wrappedGetter;
         }
         const handler = this;
@@ -26,7 +26,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
     }
     wrapSetter(originalSet: (v: any) => void): (v: any) => void {
         const wrappedSetter = setterMap.get(originalSet);
-        if (!isUndefined(wrappedSetter)) {
+        if (wrappedSetter !== undefined) {
             return wrappedSetter;
         }
         const set = function (this: any, v: any) {
@@ -38,23 +38,17 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         return set;
     }
     unwrapDescriptor(descriptor: PropertyDescriptor): PropertyDescriptor {
-        if (hasOwnProperty.call(descriptor, 'value')) {
-            // dealing with a data descriptor
+        if (descriptor.hasOwnProperty("value"))
             descriptor.value = unwrap(descriptor.value);
-        } else {
-            const { set, get } = descriptor;
-            if (!isUndefined(get)) {
-                descriptor.get = this.unwrapGetter(get);
-            }
-            if (!isUndefined(set)) {
-                descriptor.set = this.unwrapSetter(set);
-            }
-        }
+        if (descriptor.get !== undefined)
+            descriptor.get = this.unwrapGetter(descriptor.get);
+        if (descriptor.set !== undefined)
+            descriptor.set = this.unwrapSetter(descriptor.set);
         return descriptor;
     }
     unwrapGetter(redGet: () => any): () => any {
         const reverseGetter = reverseGetterMap.get(redGet);
-        if (!isUndefined(reverseGetter)) {
+        if (reverseGetter !== undefined) {
             return reverseGetter;
         }
         const handler = this;
@@ -68,7 +62,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
     }
     unwrapSetter(redSet: (v: any) => void): (v: any) => void {
         const reverseSetter = reverseSetterMap.get(redSet);
-        if (!isUndefined(reverseSetter)) {
+        if (reverseSetter !== undefined) {
             return reverseSetter;
         }
         const handler = this;
@@ -86,7 +80,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         if (oldValue !== value) {
             originalTarget[key] = value;
             valueMutated(originalTarget, key);
-        } else if (key === 'length' && isArray(originalTarget)) {
+        } else if (key === 'length' && Array.isArray(originalTarget)) {
             // fix for issue #236: push will add the new index, and by the time length
             // is updated, the internal length is already equal to the new length value
             // therefore, the oldValue is equal to the value. This is the forking logic
@@ -107,13 +101,13 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         }
     }
     preventExtensions(shadowTarget: ReactiveMembraneShadowTarget): boolean {
-        if (isExtensible(shadowTarget)) {
+        if (Object.isExtensible(shadowTarget)) {
             const { originalTarget } = this;
-            preventExtensions(originalTarget);
+            Object.preventExtensions(originalTarget);
             // if the originalTarget is a proxy itself, it might reject
             // the preventExtension call, in which case we should not attempt to lock down
             // the shadow target.
-            if (isExtensible(originalTarget)) {
+            if (Object.isExtensible(originalTarget)) {
                 return false;
             }
             this.lockShadowTarget(shadowTarget);
@@ -122,7 +116,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
     }
     defineProperty(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, descriptor: PropertyDescriptor): boolean {
         const { originalTarget, membrane: { valueMutated, tagPropertyKey } } = this;
-        if (key === tagPropertyKey && !hasOwnProperty.call(originalTarget, key)) {
+        if (key === tagPropertyKey && !Object.hasOwnProperty.call(originalTarget, key)) {
             // To avoid leaking the membrane tag property into the original target, we must
             // be sure that the original target doesn't have yet.
             // NOTE: we do not return false here because Object.freeze and equivalent operations
@@ -130,7 +124,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // is an small compromise for the sake of not having to diff the descriptors.
             return true;
         }
-        ObjectDefineProperty(originalTarget, key, this.unwrapDescriptor(descriptor));
+        Object.defineProperty(originalTarget, key, this.unwrapDescriptor(descriptor));
         // intentionally testing if false since it could be undefined as well
         if (descriptor.configurable === false) {
             this.copyDescriptorIntoShadowTarget(shadowTarget, key);
@@ -138,4 +132,14 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         valueMutated(originalTarget, key);
         return true;
     }
+}
+
+function toString(obj: any): string {
+    if (obj && obj.toString) {
+        return obj.toString();
+    } 
+    if (typeof obj === 'object') {
+        return Object.prototype.toString.call(obj);
+    } 
+    return obj + '';
 }
