@@ -1,6 +1,4 @@
-import { unwrap } from './shared';
 import type { ReactiveMembrane } from './reactive-membrane';
-
 export type ReactiveMembraneShadowTarget = object;
 
 export abstract class BaseProxyHandler {
@@ -13,7 +11,7 @@ export abstract class BaseProxyHandler {
     }
     
     unwrapValue(value: any): any {
-        return unwrap(value);
+        return this.membrane.unwrapProxy(value);
     }
     
     transformValue(value: any, reverse: boolean = false) {
@@ -94,17 +92,15 @@ export abstract class BaseProxyHandler {
         /* No op */
     }
     get(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey): any {
-        const { originalTarget, membrane: { valueObserved } } = this;
-        const value = originalTarget[key];
-        valueObserved(originalTarget, key);
+        const value = this.originalTarget[key];
+        this.membrane.valueObserved(this.originalTarget, key);
         return this.wrapValue(value);
     }
     has(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey): boolean {
-        const { membrane: { tagPropertyKey, valueObserved } } = this;
-        valueObserved(this.originalTarget, key);
+        this.membrane.valueObserved(this.originalTarget, key);
         // since key is never going to be undefined, and tagPropertyKey might be undefined
         // we can simply compare them as the second part of the condition.
-        return key in this.originalTarget || key === tagPropertyKey;
+        return key in this.originalTarget || key === this.membrane.tagPropertyKey;
     }
     ownKeys(shadowTarget: ReactiveMembraneShadowTarget) {
         const { membrane: { tagPropertyKey } } = this;

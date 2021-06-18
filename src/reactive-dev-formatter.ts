@@ -1,6 +1,6 @@
 import {
     unwrap
-} from './shared';
+} from './reactive-membrane';
 
 // Define globalThis since it's not current defined in by typescript.
 // https://github.com/tc39/proposal-global
@@ -73,7 +73,12 @@ function getGlobal(): any {
     return {};
 }
 
-export function init() {
+
+if (process.env.NODE_ENV !== 'production') {
+    init();
+}
+
+function init() {
     if (process.env.NODE_ENV === 'production') {
         // this method should never leak to prod
         throw new ReferenceError();
