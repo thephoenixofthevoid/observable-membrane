@@ -1,4 +1,3 @@
-import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
 const mapping = new WeakMap<() => any, () => any>();
@@ -15,7 +14,7 @@ export class ReadOnlyHandler extends BaseProxyHandler {
         const handler = this;
         const get = function (this: any): any {
             // invoking the original getter with the original target
-            return handler.wrapValue(originalGet.call(unwrap(this)));
+            return handler.wrapValue(originalGet.call(handler.unwrapValue(this)));
         };
         mapping.set(originalGet, get);
         return get;
@@ -42,11 +41,6 @@ export class ReadOnlyHandler extends BaseProxyHandler {
             throw new Error(`Invalid mutation: Cannot delete "${key.toString()}" on "${this.originalTarget}". "${this.originalTarget}" is read-only.`);
         }
         return false;
-    }
-    setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any {
-        if (process.env.NODE_ENV !== 'production') {
-            throw new Error(`Invalid prototype mutation: Cannot set prototype on "${this.originalTarget}". "${this.originalTarget}" prototype is read-only.`);
-        }
     }
     preventExtensions(shadowTarget: ReactiveMembraneShadowTarget): boolean {
         if (process.env.NODE_ENV !== 'production') {

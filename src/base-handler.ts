@@ -1,3 +1,4 @@
+import { unwrap } from './shared';
 import type { ReactiveMembrane } from './reactive-membrane';
 
 export type ReactiveMembraneShadowTarget = object;
@@ -9,6 +10,10 @@ export abstract class BaseProxyHandler {
     constructor(membrane: ReactiveMembrane, value: any) {
         this.originalTarget = value;
         this.membrane = membrane;
+    }
+    
+    unwrapValue(value: any): any {
+        return unwrap(value);
     }
     
     transformValue(value: any, reverse: boolean = false) {
@@ -70,12 +75,18 @@ export abstract class BaseProxyHandler {
 
     abstract set(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, value: any): boolean;
     abstract deleteProperty(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey): boolean;
-    abstract setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any;
+    //abstract setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any;
     abstract preventExtensions(shadowTarget: ReactiveMembraneShadowTarget): boolean;
     abstract defineProperty(shadowTarget: ReactiveMembraneShadowTarget, key: PropertyKey, descriptor: PropertyDescriptor): boolean;
+    
 
     // Shared Traps
 
+    setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any {
+        if (process.env.NODE_ENV !== 'production') {
+            throw new Error(`Invalid setPrototypeOf invocation for reactive proxy ${toString(this.originalTarget)}. Prototype of reactive objects cannot be changed.`);
+        }
+    }
     apply(shadowTarget: ReactiveMembraneShadowTarget, thisArg: any, argArray: any[]) {
         /* No op */
     }

@@ -1,12 +1,6 @@
-import { unwrap } from './shared';
 import { BaseProxyHandler, ReactiveMembraneShadowTarget } from './base-handler';
 
 const mapping = new WeakMap<any, any>;
-
-function bidirectionalSet(map, value1, value2) {
-	map.set(value1, value2)
-	map.set(value2, value1)
-}
 
 function transformOp(handler, op, reverse) {
 	return thatOp
@@ -22,16 +16,14 @@ function transformOp(handler, op, reverse) {
 function cachedTransformOp(mapping, handler, op, reverse) {
 	if (mapping.has(op)) return mapping.get(op)
 	const thatOp = transformOp(handler, op, reverse)
-	bidirectionalSet(mapping, op, thatOp)
+	mapping.set(thatOp, op)
+	mapping.set(op, thatOp)
 	return thatOp
 }
 
 export class ReactiveProxyHandler extends BaseProxyHandler {
     wrapValue(value: any): any {
         return this.membrane.getProxy(value);
-    }
-    unwrapValue(value: any): any {
-        return unwrap(value);
     }
     wrapGetter(op: () => void): () => any {
         return cachedTransformOp(mapping, this, op, false);
@@ -41,7 +33,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
     }
     private unwrapDescriptor(descriptor: PropertyDescriptor): PropertyDescriptor {
         if (descriptor.hasOwnProperty("value")) 
-        	descriptor.value = unwrap(descriptor.value);
+        	descriptor.value = this.unwrapValue(descriptor.value);
         if (descriptor.get !== undefined) 
         	descriptor.get = this.unwrapGetter(descriptor.get);
         if (descriptor.set !== undefined) 
@@ -65,7 +57,7 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
             // is updated, the internal length is already equal to the new length value
             // therefore, the oldValue is equal to the value. This is the forking logic
             // to support this use case.
-            valueMutated(this.originalTarget, key);
+            this.membrane.valueMutated(this.originalTarget, key);
         }
         return true;
     }
@@ -73,11 +65,6 @@ export class ReactiveProxyHandler extends BaseProxyHandler {
         delete this.originalTarget[key];
         this.membrane.valueMutated(this.originalTarget, key);
         return true;
-    }
-    setPrototypeOf(shadowTarget: ReactiveMembraneShadowTarget, prototype: any): any {
-        if (process.env.NODE_ENV !== 'production') {
-            throw new Error(`Invalid setPrototypeOf invocation for reactive proxy ${toString(this.originalTarget)}. Prototype of reactive objects cannot be changed.`);
-        }
     }
     preventExtensions(shadowTarget: ReactiveMembraneShadowTarget): boolean {
         if (!Object.isExtensible(shadowTarget)) return true;
