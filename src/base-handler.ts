@@ -10,6 +10,17 @@ export abstract class BaseProxyHandler {
         this.originalTarget = value;
         this.membrane = membrane;
     }
+    
+    transformValue(value: any, reverse: boolean = false) {
+    	if (value === undefined) {
+    		return undefined;
+    	}
+    	if (reverse === false) {
+    		return this.wrapValue(value)
+    	} else {
+    		return this.unwrapValue(value)
+    	}
+    }
 
     // Abstract utility methods
 
